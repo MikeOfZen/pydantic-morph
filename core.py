@@ -1,6 +1,6 @@
 from copy import copy
-from pydantic import BaseModel, ConfigDict, create_model
-from typing import Any, Callable, Dict, Iterable, Protocol
+from pydantic import BaseModel, ConfigDict, create_model, Field
+from typing import Any, Callable, Dict, Iterable, Protocol, Union
 from pydantic.fields import FieldInfo
 
 
@@ -175,3 +175,128 @@ class Rename(ModelTransformer):
 
         decomposed_model.model_fields = new_fields
         return decomposed_model
+
+
+class DefaultFactoryTag:
+    """Wrapper for default factory values"""
+
+    def __init__(self, factory: Callable[[], Any]):
+        self.factory = factory
+
+
+class Optional(ModelTransformer):
+    """
+    Makes fields optional by adding None to their type union and setting defaults.
+
+    Supports four mutually exclusive modes:
+    - all: Make all fields optional with None default
+    - exclude: Make all fields optional except specified ones
+    - include_only: Make only specified fields optional
+    - callable: Use function to determine which fields to make optional and their defaults
+
+    Args:
+        all: Boolean - make all fields optional with None default
+        exclude: Iterable of field names to exclude from making optional
+        include_only: Iterable of field names to make optional (all others unchanged)
+        callable: Function(name: str, field: FieldInfo) -> (bool, Any) that returns
+                 (should_make_optional, default_value)
+        defaults: Dict mapping field names to default values (works with all modes)
+
+    Raises:
+        ValueError: If more than one mode option is provided
+
+    Example:
+        # Make all fields optional
+        Optional(all=True)
+
+        # Make all except specific fields optional
+        Optional(exclude=['id', 'created_at'], defaults={'name': 'Anonymous'})
+
+        # Make only specific fields optional
+        Optional(include_only=['name', 'email'])
+
+        # Custom logic with function returning (should_make_optional, default_value)
+        Optional(callable=lambda name, field: (not name.endswith('_id'), f'default_{name}'))
+    """
+
+    def __init__(
+        self,
+        all: bool | None = None,
+        exclude: Iterable[str] | None = None,
+        include_only: Iterable[str] | None = None,
+        optional_func: Callable[[str, FieldInfo], tuple[bool, Any]] | None = None,
+        defaults: Dict[str, Any] | None = None,
+    ):
+        if sum(x is not None for x in [all, exclude, include_only, optional_func]) != 1:
+            raise ValueError(
+                "Must provide one of: all, exclude, include_only, or callable"
+            )
+
+        self.defaults = defaults or {}
+
+        # Build the appropriate logic
+        if all is not None and all:
+            self._get_optional_info = lambda name, field: (
+                True,
+                self.defaults.get(name),
+            )
+        elif exclude is not None:
+            exclude_set = set(exclude)
+            self._get_optional_info = lambda name, field: (
+                name not in exclude_set,
+                self.defaults.get(name),
+            )
+        elif include_only is not None:
+            include_set = set(include_only)
+            self._get_optional_info = lambda name, field: (
+                name in include_set,
+                self.defaults.get(name),
+            )
+        elif optional_func is not None:  # callable
+            self._get_optional_info = optional_func  # type: ignore
+        else:
+            raise ValueError(
+                "Must provide one of: all, exclude, include_only, or callable"
+            )
+
+    def __call__(self, decomposed_model: DecomposedModel) -> DecomposedModel:
+        new_fields = {}
+
+        for field_name, field_info in decomposed_model.model_fields.items():
+            make_opt, default_value = self._get_optional_info(field_name, field_info)
+
+            if field_info.is_required() and make_opt:
+                new_fields[field_name] = self._make_optional(field_info, default_value)
+            else:
+                new_fields[field_name] = field_info
+
+        decomposed_model.model_fields = new_fields
+        return decomposed_model
+
+    @staticmethod
+    def _make_optional(field_info: FieldInfo, default_value: Any) -> FieldInfo:
+        ann = field_info.annotation
+        # Case 1: Factory - no need to add None to annotation
+        if isinstance(default_value, DefaultFactoryTag):
+            return FieldInfo.from_annotated_attribute(
+                annotation=ann,  # type: ignore
+                default=Field(default_factory=default_value.factory),
+            )
+
+        # Case 2: None default - add None to annotation if not already there
+        if default_value is None:
+            annotation = (
+                Union[ann, None]
+                if not isinstance(None, ann)  # type: ignore
+                else ann
+            )
+            return FieldInfo.from_annotated_attribute(
+                annotation=annotation,  # type: ignore
+                default=None,
+            )
+
+        # Case 3: Other value - keep original annotation
+        return FieldInfo.from_annotated_attribute(
+            annotation=ann,  # type: ignore
+            default=default_value,
+        )
