@@ -1,7 +1,56 @@
 from copy import copy
 from pydantic import BaseModel, ConfigDict, create_model, Field
-from typing import Any, Callable, Dict, Iterable, Protocol, Union
+from typing import Any, Callable, Dict, Protocol, Tuple, Union
 from pydantic.fields import FieldInfo
+
+
+class VariantPipeline:
+    """
+    Immutable pipeline that holds an ordered tuple of operations (functions).
+    Supports list-like operations but returns new instances for immutability.
+    """
+
+    def __init__(self, *operations: Callable):
+        self._operations: Tuple[Callable, ...] = tuple(operations)
+
+    def __call__(self, obj: Any) -> Any:
+        """Execute all operations sequentially on the input object"""
+        for operation in self._operations:
+            obj = operation(obj)
+        return obj
+
+    def append(self, operation: Callable) -> "VariantPipeline":
+        """Return a new pipeline with the operation appended"""
+        return VariantPipeline(*self._operations, operation)
+
+    def insert(self, index: int, operation: Callable) -> "VariantPipeline":
+        """Return a new pipeline with the operation inserted at the given index"""
+        ops = list(self._operations)
+        ops.insert(index, operation)
+        return VariantPipeline(*ops)
+
+    def replace(self, index: int, operation: Callable) -> "VariantPipeline":
+        """Return a new pipeline with the operation at index replaced"""
+        ops = list(self._operations)
+        ops[index] = operation
+        return VariantPipeline(*ops)
+
+    def __getitem__(self, key: Union[int, slice]) -> Union[Callable, "VariantPipeline"]:
+        """Support indexing and slicing"""
+        if isinstance(key, slice):
+            return VariantPipeline(*self._operations[key])
+        return self._operations[key]
+
+    def __len__(self) -> int:
+        """Return the number of operations in the pipeline"""
+        return len(self._operations)
+
+    def __iter__(self):
+        """Allow iteration over operations"""
+        return iter(self._operations)
+
+    def __repr__(self) -> str:
+        return f"VariantPipeline({', '.join(op.__name__ if hasattr(op, '__name__') else str(op) for op in self._operations)})"
 
 
 class VariantPipe:
@@ -47,7 +96,7 @@ class DecomposedModel:
 
     def build(self, name: str, base: Any = None) -> type[BaseModel]:
         return create_model(
-            name,
+            self.original_model_cls.__name__ + name,
             __config__=ConfigDict(self.model_config),  # type: ignore
             __doc__=self.model_doc,
             __base__=base,
@@ -66,237 +115,21 @@ class DecomposedModel:
         return model_fields
 
 
+class VariantContext:
+    original_model: type[BaseModel]
+    current_variant: DecomposedModel | type[BaseModel]
+    metadata: Dict[str, Any]
+
+    def __init__(self, name: str):
+        self.name = name
+        self.metadata = {}
+
+    def __call__(self, model_cls: type[BaseModel]) -> "VariantContext":
+        """Initialize with a BaseModel class"""
+        self.original_model = model_cls
+        self.current_variant = DecomposedModel(model_cls)
+        return self
+
+
 class ModelTransformer(Protocol):
-    def __call__(self, decomposed_model: DecomposedModel) -> DecomposedModel: ...
-
-
-class Filter(ModelTransformer):
-    """
-    Filters fields from a DecomposedModel based on field names or custom logic.
-
-    Supports three mutually exclusive filtering modes:
-    - exclude: Remove specific fields by name
-    - include_only: Keep only specific fields by name
-    - filter_func: Custom function that returns True for fields to REMOVE
-
-    Args:
-        exclude: Iterable of field names to exclude from the model
-        include_only: Iterable of field names to keep (all others removed)
-        filter_func: Function(name: str, field: FieldInfo) -> bool that returns
-                    True for fields that should be REMOVED
-
-    Raises:
-        ValueError: If more than one filtering option is provided
-
-    Example:
-        # Remove specific fields
-        Filter(exclude=['id', 'created_at'])
-
-        # Keep only specific fields
-        Filter(include_only=['name', 'email'])
-
-        # Custom filter logic
-        Filter(filter_func=lambda name, field: field.is_required() == False)
-    """
-
-    def __init__(
-        self,
-        exclude: Iterable[str] | None = None,
-        include_only: Iterable[str] | None = None,
-        filter_func: Callable[[str, FieldInfo], bool] | None = None,
-    ):
-        if sum(x is not None for x in [exclude, include_only, filter_func]) != 1:
-            raise ValueError(
-                "Must provide one of: exclude, include_only, or filter_func"
-            )
-
-        # Build the appropriate filter lambda
-        if exclude is not None:
-            exclude_set = set(exclude)
-            self._filter_func = lambda name, field: name in exclude_set
-        elif include_only is not None:
-            include_set = set(include_only)
-            self._filter_func = lambda name, field: name not in include_set
-        else:
-            self._filter_func = filter_func
-
-    def __call__(self, decomposed_model: DecomposedModel) -> DecomposedModel:
-        # Apply the filter function to the model fields
-
-        for name, field in decomposed_model.model_fields.items():
-            if self._filter_func(name, field):  # type: ignore
-                decomposed_model.model_fields.pop(name, None)
-
-        return decomposed_model
-
-
-class Rename(ModelTransformer):
-    """
-    Renames fields in a DecomposedModel using a mapping dict or custom function.
-
-    Supports two renaming modes:
-    - mapping: Dictionary of old_name -> new_name mappings
-    - rename_func: Function that takes field name and returns new name (or same name)
-
-    Args:
-        mapping: Dict mapping current field names to new field names
-        rename_func: Function(name: str) -> str that returns the new field name
-
-    Raises:
-        ValueError: If both or neither renaming options are provided
-
-    Example:
-        # Simple field renaming
-        Rename(mapping={'user_id': 'id', 'email_addr': 'email'})
-
-        # Pattern-based renaming with regex
-        Rename(rename_func=lambda name: re.sub(r'_id$', '', name))
-
-        # Convert snake_case to camelCase
-        Rename(rename_func=lambda name: re.sub(r'_([a-z])', lambda m: m.group(1).upper(), name))
-    """
-
-    def __init__(
-        self,
-        mapping: Dict[str, str] | None = None,
-        rename_func: Callable[[str], str] | None = None,
-    ):
-        if sum(x is not None for x in [mapping, rename_func]) != 1:
-            raise ValueError("Must provide either mapping or rename_func")
-
-        self._rename_func = rename_func if rename_func else mapping.get  # type: ignore
-
-    def __call__(self, decomposed_model: DecomposedModel) -> DecomposedModel:
-        new_fields = {}
-
-        for old_name, field in decomposed_model.model_fields.items():
-            new_name = self._rename_func(old_name)
-            new_fields[new_name] = field
-
-        decomposed_model.model_fields = new_fields
-        return decomposed_model
-
-
-class DefaultFactoryTag:
-    """Wrapper for default factory values"""
-
-    def __init__(self, factory: Callable[[], Any]):
-        self.factory = factory
-
-
-class Optional(ModelTransformer):
-    """
-    Makes fields optional by adding None to their type union and setting defaults.
-
-    Supports four mutually exclusive modes:
-    - all: Make all fields optional with None default
-    - exclude: Make all fields optional except specified ones
-    - include_only: Make only specified fields optional
-    - callable: Use function to determine which fields to make optional and their defaults
-
-    Args:
-        all: Boolean - make all fields optional with None default
-        exclude: Iterable of field names to exclude from making optional
-        include_only: Iterable of field names to make optional (all others unchanged)
-        callable: Function(name: str, field: FieldInfo) -> (bool, Any) that returns
-                 (should_make_optional, default_value)
-        defaults: Dict mapping field names to default values (works with all modes)
-
-    Raises:
-        ValueError: If more than one mode option is provided
-
-    Example:
-        # Make all fields optional
-        Optional(all=True)
-
-        # Make all except specific fields optional
-        Optional(exclude=['id', 'created_at'], defaults={'name': 'Anonymous'})
-
-        # Make only specific fields optional
-        Optional(include_only=['name', 'email'])
-
-        # Custom logic with function returning (should_make_optional, default_value)
-        Optional(callable=lambda name, field: (not name.endswith('_id'), f'default_{name}'))
-    """
-
-    def __init__(
-        self,
-        all: bool | None = None,
-        exclude: Iterable[str] | None = None,
-        include_only: Iterable[str] | None = None,
-        optional_func: Callable[[str, FieldInfo], tuple[bool, Any]] | None = None,
-        defaults: Dict[str, Any] | None = None,
-    ):
-        if sum(x is not None for x in [all, exclude, include_only, optional_func]) != 1:
-            raise ValueError(
-                "Must provide one of: all, exclude, include_only, or callable"
-            )
-
-        self.defaults = defaults or {}
-
-        # Build the appropriate logic
-        if all is not None and all:
-            self._get_optional_info = lambda name, field: (
-                True,
-                self.defaults.get(name),
-            )
-        elif exclude is not None:
-            exclude_set = set(exclude)
-            self._get_optional_info = lambda name, field: (
-                name not in exclude_set,
-                self.defaults.get(name),
-            )
-        elif include_only is not None:
-            include_set = set(include_only)
-            self._get_optional_info = lambda name, field: (
-                name in include_set,
-                self.defaults.get(name),
-            )
-        elif optional_func is not None:  # callable
-            self._get_optional_info = optional_func  # type: ignore
-        else:
-            raise ValueError(
-                "Must provide one of: all, exclude, include_only, or callable"
-            )
-
-    def __call__(self, decomposed_model: DecomposedModel) -> DecomposedModel:
-        new_fields = {}
-
-        for field_name, field_info in decomposed_model.model_fields.items():
-            make_opt, default_value = self._get_optional_info(field_name, field_info)
-
-            if field_info.is_required() and make_opt:
-                new_fields[field_name] = self._make_optional(field_info, default_value)
-            else:
-                new_fields[field_name] = field_info
-
-        decomposed_model.model_fields = new_fields
-        return decomposed_model
-
-    @staticmethod
-    def _make_optional(field_info: FieldInfo, default_value: Any) -> FieldInfo:
-        ann = field_info.annotation
-        # Case 1: Factory - no need to add None to annotation
-        if isinstance(default_value, DefaultFactoryTag):
-            return FieldInfo.from_annotated_attribute(
-                annotation=ann,  # type: ignore
-                default=Field(default_factory=default_value.factory),
-            )
-
-        # Case 2: None default - add None to annotation if not already there
-        if default_value is None:
-            annotation = (
-                Union[ann, None]
-                if not isinstance(None, ann)  # type: ignore
-                else ann
-            )
-            return FieldInfo.from_annotated_attribute(
-                annotation=annotation,  # type: ignore
-                default=None,
-            )
-
-        # Case 3: Other value - keep original annotation
-        return FieldInfo.from_annotated_attribute(
-            annotation=ann,  # type: ignore
-            default=default_value,
-        )
+    def __call__(self, context: VariantContext) -> VariantContext: ...

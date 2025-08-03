@@ -22,7 +22,8 @@ This library provides APIs to decompose, transform, and rebuild Pydantic models 
 - Use specific exception types
 - Provide meaningful error messages
 - Never ignore or suppress errors silently
-
+- Properly use classmethod and staticmethods, or just a global method where appropriate
+- if some long name variable is repeated more than 3 times make a shorter version of it.
 ## Forbidden Practices
 - No functions longer than 50 lines
 - Avoid classes with more than 7 methods
@@ -71,6 +72,8 @@ This library provides APIs to decompose, transform, and rebuild Pydantic models 
 - Don't create variables if their only use is in a single expression!
 - Prefer immutable data structures where possible
 - Use context managers for resource management
+- Use logical operators where it fits (XOR, AND, OR, NOT)
+- don not mutate objects directly, use proper constructors and methods
 
 ## Library Structure
 ```

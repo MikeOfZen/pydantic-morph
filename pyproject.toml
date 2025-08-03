@@ -1,5 +1,5 @@
 [project]
-name = "pydantic-variants"
+name = "pydantic-morph"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -10,5 +10,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "deepdiff>=8.5.0",
     "jupyter>=1.1.1",
 ]

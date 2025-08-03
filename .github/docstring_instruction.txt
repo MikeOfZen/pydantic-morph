@@ -1,0 +1,22 @@
+"""
+One-line summary of the transformer's purpose and when to use it.
+
+Args:
+    param (type): What it does and expected values.
+    param2 (type, optional): Purpose. Defaults to X.
+
+Raises:
+    ValueError: When X condition occurs.
+
+Example:
+    ```python
+    # Most common usage pattern
+    Transformer(param="value")
+
+    # In pipeline context
+    VariantPipe().then(Transformer(param="value")).then(Build())
+    ```
+
+Note:
+    Key limitation or gotcha users must know.
+"""
