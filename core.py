@@ -1,12 +1,16 @@
 from copy import copy
-from pydantic import BaseModel, ConfigDict, create_model, Field
+from pydantic import BaseModel, ConfigDict, create_model
 from typing import Any, Callable, Dict, Protocol, Tuple, Union
 from pydantic.fields import FieldInfo
 
 
-class VariantPipeline:
+class VariantPipe:
     """
-    Immutable pipeline that holds an ordered tuple of operations (functions).
+    Used to compose variant creation flows by chaining operations.
+    remember to supply a VariantContext in the beginning of the pipeline.
+    and ExtractVariant at the end to get the final model.
+
+    This is an immutable pipeline that holds an ordered tuple of operations (functions).
     Supports list-like operations but returns new instances for immutability.
     """
 
@@ -19,26 +23,26 @@ class VariantPipeline:
             obj = operation(obj)
         return obj
 
-    def append(self, operation: Callable) -> "VariantPipeline":
+    def append(self, operation: Callable) -> "VariantPipe":
         """Return a new pipeline with the operation appended"""
-        return VariantPipeline(*self._operations, operation)
+        return VariantPipe(*self._operations, operation)
 
-    def insert(self, index: int, operation: Callable) -> "VariantPipeline":
+    def insert(self, index: int, operation: Callable) -> "VariantPipe":
         """Return a new pipeline with the operation inserted at the given index"""
         ops = list(self._operations)
         ops.insert(index, operation)
-        return VariantPipeline(*ops)
+        return VariantPipe(*ops)
 
-    def replace(self, index: int, operation: Callable) -> "VariantPipeline":
+    def replace(self, index: int, operation: Callable) -> "VariantPipe":
         """Return a new pipeline with the operation at index replaced"""
         ops = list(self._operations)
         ops[index] = operation
-        return VariantPipeline(*ops)
+        return VariantPipe(*ops)
 
-    def __getitem__(self, key: Union[int, slice]) -> Union[Callable, "VariantPipeline"]:
+    def __getitem__(self, key: Union[int, slice]) -> Union[Callable, "VariantPipe"]:
         """Support indexing and slicing"""
         if isinstance(key, slice):
-            return VariantPipeline(*self._operations[key])
+            return VariantPipe(*self._operations[key])
         return self._operations[key]
 
     def __len__(self) -> int:
@@ -50,36 +54,7 @@ class VariantPipeline:
         return iter(self._operations)
 
     def __repr__(self) -> str:
-        return f"VariantPipeline({', '.join(op.__name__ if hasattr(op, '__name__') else str(op) for op in self._operations)})"
-
-
-class VariantPipe:
-    """
-    Simple recursive pipeline where each step can be a function or another Pipeline
-    """
-
-    def __init__(self, step=None):
-        self.step = step
-        self.next = None
-
-    def then(self, step_or_pipe):
-        """Add a step (function) or another pipeline to the chain"""
-        if self.next is None:
-            if callable(step_or_pipe):
-                self.next = VariantPipe(step_or_pipe)
-            else:
-                self.next = step_or_pipe
-        else:
-            self.next.then(step_or_pipe)
-        return self  # Always return root pipeline
-
-    def process(self, obj):
-        """Execute the pipeline on an object"""
-        if self.step:
-            obj = self.step(obj)
-        if self.next:
-            obj = self.next.process(obj)
-        return obj
+        return f"VariantPipe({', '.join(op.__name__ if hasattr(op, '__name__') else str(op) for op in self._operations)})"
 
 
 class DecomposedModel:
