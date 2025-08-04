@@ -1,10 +1,8 @@
-from core import DecomposedModel, ModelTransformer, VariantContext
-
+from typing import Dict
 
 from pydantic.fields import FieldInfo
 
-
-from typing import Dict
+from pydantic_variants.core import DecomposedModel, ModelTransformer, VariantContext
 
 
 class SetFields(ModelTransformer):

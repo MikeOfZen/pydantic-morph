@@ -1117,7 +1117,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pydantic-morph"
+name = "pydantic-variants"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

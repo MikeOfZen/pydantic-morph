@@ -1,6 +1,9 @@
 from typing import Callable
+
 from pydantic import BaseModel
-from .core import VariantPipe, VariantContext, ModelTransformer
+
+from pydantic_variants.core import ModelTransformer, VariantContext, VariantPipe
+from pydantic_variants.transformers import BuildVariant, ConnectVariant
 
 
 def basic_variant_pipeline(name: str, *transformers: ModelTransformer) -> VariantPipe:
@@ -17,8 +20,6 @@ def basic_variant_pipeline(name: str, *transformers: ModelTransformer) -> Varian
     Returns:
         Complete VariantPipe ready for use with @variants decorator
     """
-    # Import here to avoid circular imports
-    from .transformers import BuildVariant, ConnectVariant
 
     return VariantPipe(
         VariantContext(name), *transformers, BuildVariant(), ConnectVariant()

@@ -1,5 +1,5 @@
 """
-Pydantic Variants
+Pydantic variants library
 
 A library for creating model variants with transformation pipelines.
 
@@ -34,24 +34,5 @@ Advanced Usage:
     ```
 """
 
-# Core public API - most users will only need these
-from .decorators import variants, basic_variant_pipeline
-
-# Advanced API - for custom pipeline creation
-from .core import VariantPipe, VariantContext
-
-# Re-export transformers for convenience
-from . import transformers
-
-__version__ = "0.1.0"
-
-__all__ = [
-    # Main decorator and helper
-    "variants",
-    "basic_variant_pipeline",
-    # Advanced pipeline building
-    "VariantPipe",
-    "VariantContext",
-    # Transformers subpackage
-    "transformers",
-]
+from pydantic_variants.core import VariantContext, VariantPipe
+from pydantic_variants.decorators import basic_variant_pipeline, variants

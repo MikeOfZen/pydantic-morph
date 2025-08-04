@@ -1,11 +1,9 @@
-from core import DecomposedModel, ModelTransformer, VariantContext
-from field_ops import modify_fieldinfo
-
+from typing import Any, Callable, Dict, Iterable, Union
 
 from pydantic.fields import FieldInfo
 
-
-from typing import Any, Callable, Dict, Iterable
+from pydantic_variants.core import DecomposedModel, ModelTransformer, VariantContext
+from pydantic_variants.field_ops import modify_fieldinfo
 
 
 class DefaultFactoryTag:

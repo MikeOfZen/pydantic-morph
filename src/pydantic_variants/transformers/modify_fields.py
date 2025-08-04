@@ -1,8 +1,8 @@
-from typing import Any, Dict
 from copy import copy
+from typing import Any, Dict
 
-from ..core import DecomposedModel, VariantContext, ModelTransformer
-from ..field_ops import modify_fieldinfo
+from pydantic_variants.core import DecomposedModel, ModelTransformer, VariantContext
+from pydantic_variants.field_ops import modify_fieldinfo
 
 
 class ModifyFields(ModelTransformer):

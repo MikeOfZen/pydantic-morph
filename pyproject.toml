@@ -1,15 +1,47 @@
 [project]
-name = "pydantic-morph"
-version = "0.1.0"
-description = "Add your description here"
+name = "pydantic-variants"
+version = "0.2.0"
+description = "Create Pydantic model variants with transformation pipelines for different use cases (Input/Output/Update)"
 readme = "README.md"
+authors = [
+    { name = "MikeOfZen", email = "michael.zl.prime@gmail.com" }
+]
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.11.7",
 ]
+license = { text = "Apache-2.0" }
+keywords = ["pydantic", "fastapi", "api", "schema", "validation", "serialization", "json", "dataclass", "orm", "typing", "decorator", "models", "model", "forms", "crud", "rest"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+    "Topic :: File Formats :: JSON :: JSON Schema",
+    "Framework :: FastAPI",
+    "Framework :: Pydantic",
+    "Framework :: Pydantic :: 2",
+]
+
 
 [dependency-groups]
 dev = [
     "deepdiff>=8.5.0",
     "jupyter>=1.1.1",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff]
+line-length = 140

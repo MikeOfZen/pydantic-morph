@@ -1,6 +1,7 @@
 from copy import copy
-from pydantic import BaseModel, ConfigDict, create_model
 from typing import Any, Callable, Dict, Protocol, Tuple, Union
+
+from pydantic import BaseModel, ConfigDict, create_model
 from pydantic.fields import FieldInfo
 
 

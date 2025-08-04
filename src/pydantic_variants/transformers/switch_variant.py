@@ -1,12 +1,11 @@
-from typing import Any, Callable, Dict, Iterable, Protocol, Union, get_origin, get_args
-from pydantic.fields import FieldInfo
+from typing import Any, Iterable, get_origin, get_args
 from pydantic import BaseModel
 
-from core import DecomposedModel, ModelTransformer, VariantContext
-from field_ops import modify_fieldinfo
+from pydantic_variants.core import DecomposedModel, ModelTransformer, VariantContext
+from pydantic_variants.field_ops import modify_fieldinfo
 
 
-class SwitchNested(ModelTransformer):
+class SwitchVariant(ModelTransformer):
     """
     Switches nested BaseModel types to their variants in field annotations.
     this allows nested schema changes of any depth.

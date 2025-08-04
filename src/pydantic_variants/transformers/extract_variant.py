@@ -1,5 +1,6 @@
-from core import DecomposedModel, VariantContext
 from pydantic import BaseModel
+
+from pydantic_variants.core import DecomposedModel, VariantContext
 
 
 class ExtractVariant:

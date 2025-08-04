@@ -1,7 +1,6 @@
-from core import DecomposedModel, ModelTransformer, VariantContext
-
-
 from typing import Any
+
+from pydantic_variants.core import DecomposedModel, ModelTransformer, VariantContext
 
 
 class BuildVariant(ModelTransformer):
