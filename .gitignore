@@ -10,4 +10,5 @@ wheels/
 .venv
 
 .scratch
+.scratch2
 .old
