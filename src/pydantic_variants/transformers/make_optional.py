@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Iterable, Union
+from typing import Any, Callable, Dict, Iterable, Type, Union, get_args, get_origin
 
 from pydantic.fields import FieldInfo
 
@@ -57,9 +57,7 @@ class MakeOptional(ModelTransformer):
         defaults: Dict[str, Any] | None = None,
     ):
         if sum(x is not None for x in [all, exclude, include_only, optional_func]) != 1:
-            raise ValueError(
-                "Must provide one of: all, exclude, include_only, or callable"
-            )
+            raise ValueError("Must provide one of: all, exclude, include_only, or callable")
 
         self.defaults = defaults or {}
 
@@ -84,15 +82,11 @@ class MakeOptional(ModelTransformer):
         elif optional_func is not None:  # callable
             self._get_optional_info = optional_func  # type: ignore
         else:
-            raise ValueError(
-                "Must provide one of: all, exclude, include_only, or callable"
-            )
+            raise ValueError("Must provide one of: all, exclude, include_only, or callable")
 
     def __call__(self, context: VariantContext) -> VariantContext:
         if not isinstance(context.current_variant, DecomposedModel):
-            raise ValueError(
-                "Build transformer requires DecomposedModel, got built model"
-            )
+            raise ValueError("Build transformer requires DecomposedModel, got built model")
         new_fields = {}
         for field_name, field_info in context.current_variant.model_fields.items():
             make_opt, default_value = self._get_optional_info(field_name, field_info)
@@ -113,13 +107,21 @@ class MakeOptional(ModelTransformer):
 
         # Case 2: None default - add None to annotation if not already there
         elif default_value is None:
-            annotation = (
-                Union[ann, None]
-                if not isinstance(None, ann)  # type: ignore
-                else ann
-            )
+            annotation = ann if MakeOptional._none_in_annotation(ann) else Union[ann, None]
             return modify_fieldinfo(field_info, annotation=annotation, default=None)
 
         # Case 3: Other value - keep original annotation
         else:
             return modify_fieldinfo(field_info, default=default_value)
+
+    @staticmethod
+    def _none_in_annotation(annotation: Any) -> bool:
+        if annotation is None or annotation is Any:
+            return True
+        origin = get_origin(annotation)
+        if origin is Union:
+            args = get_args(annotation)
+            if type(None) in args or Any in args:
+                return True
+
+        return False

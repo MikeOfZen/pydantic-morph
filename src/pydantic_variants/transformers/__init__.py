@@ -16,3 +16,4 @@ from pydantic_variants.transformers.set_attributes import SetAttribute
 from pydantic_variants.transformers.set_fields import SetFields
 from pydantic_variants.transformers.switch_variant import SwitchVariant
 from pydantic_variants.transformers.filter_tag import FilterTag, Tag
+from pydantic_variants.transformers.model_dict import ModelDict
