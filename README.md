@@ -176,6 +176,10 @@ admin_output_pipeline = basic_variant_pipeline('AdminView',
 filter_sensitive = FilterFields(exclude=['password', 'internal_id'])
 keep_public = FilterFields(include_only=['name', 'email'])
 
+# Filter fields by metadata tags
+filter_internal = FilterTag('internal')  # Removes fields tagged with Tag('internal')
+filter_multiple = FilterTag(['internal', 'deprecated'])  # Multiple tag keys
+
 # Make fields optional
 all_optional = MakeOptional(all=True)
 except_required = MakeOptional(exclude=['id'])
@@ -304,28 +308,27 @@ async def create_user(user: User.Create):
 
 ## ⚠️ Schema Rebuilding
 
-If your schema has forward references, use the variants decorator (as a simple function) **after** the schema is completely defined and rebuilt:
+If your schema has forward references, use the delayed decorator and call `_build_variants()` **after** the schema is completely defined and rebuilt:
 
 ```python
-# Define all models first
+# Define all models with delayed_build=True
+@variants(user_pipeline, delayed_build=True)
 class User(BaseModel):
     name: str
     posts: list['Post']
 
+@variants(post_pipeline, delayed_build=True)
 class Post(BaseModel):
     title: str
     author: User
 
 # Rebuild models to resolve forward references
 User.model_rebuild()
+Post.model_rebuild()
 
-# Apply variants after all models are well defined
-user_pipeline = basic_variant_pipeline('Input', FilterFields(exclude=['id']))
-post_pipeline = basic_variant_pipeline('Input', FilterFields(exclude=['id']))
-
-User = variants(user_pipeline)(User)
-Post = variants(post_pipeline)(Post)
-
+# Build variants after all models are well defined
+User._build_variants()
+Post._build_variants()
 ```
 
 ## 📖 Complete API Reference

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from pydantic_variants.core import ModelTransformer, VariantContext, VariantPipe
 from pydantic_variants.transformers import BuildVariant, ConnectVariant
+from pydantic_variants.transformers.extract_variant import ExtractVariant
 
 
 def basic_variant_pipeline(name: str, *transformers: ModelTransformer) -> VariantPipe:
@@ -21,59 +22,33 @@ def basic_variant_pipeline(name: str, *transformers: ModelTransformer) -> Varian
         Complete VariantPipe ready for use with @variants decorator
     """
 
-    return VariantPipe(
-        VariantContext(name), *transformers, BuildVariant(), ConnectVariant()
-    )
+    return VariantPipe(VariantContext(name), *transformers, BuildVariant(), ConnectVariant(), ExtractVariant())
 
 
-def variants(*pipelines: VariantPipe) -> Callable[[type[BaseModel]], type[BaseModel]]:
+def variants(*pipelines: VariantPipe, delayed_build: bool = False) -> Callable[[type[BaseModel]], type[BaseModel]]:
     """
     Decorator that generates model variants using VariantPipe pipelines.
 
-    Each pipeline should be a complete transformation pipeline that includes
-    VariantContext creation, field transformers, BuildVariant, and ConnectVariant.
-    Use create_variant_pipeline() helper for easier pipeline creation.
-
     Args:
-        *pipelines: Variable number of VariantPipe instances, each defining
-                   a complete transformation pipeline for creating a variant
+        *pipelines: VariantPipe instances defining transformation pipelines
+        delayed_build: If True, attaches pipeline logic to _build_variants method
+                      instead of executing immediately
 
     Returns:
-        Decorated BaseModel class with variants attached
-
-    Example:
-        ```python
-        from pydantic_variants import variants, create_variant_pipeline
-        from pydantic_variants.transformers import FilterFields, MakeOptional
-
-        input_pipeline = create_variant_pipeline(
-            'Input',
-            FilterFields(exclude=['id', 'created_at']),
-            MakeOptional(all=True)
-        )
-
-        output_pipeline = create_variant_pipeline(
-            'Output',
-            FilterFields(exclude=['internal_notes'])
-        )
-
-        @variants(input_pipeline, output_pipeline)
-        class User(BaseModel):
-            id: int
-            name: str
-            email: str
-            internal_notes: str = ""
-            created_at: datetime
-
-        # Access variants
-        user_input = User.Input(name="John", email="john@example.com")
-        user_output = User.Output(**user.model_dump())
-        ```
+        Decorated BaseModel class with variants attached or _build_variants method
     """
 
-    def decorator(model_cls: type[BaseModel]) -> type[BaseModel]:
+    def immediate_decorator(model_cls: type[BaseModel]) -> type[BaseModel]:
         for pipeline in pipelines:
             pipeline(model_cls)
         return model_cls
 
-    return decorator
+    def delayed_decorator(model_cls: type[BaseModel]) -> type[BaseModel]:
+        def _build_variants():
+            for pipeline in pipelines:
+                pipeline(model_cls)
+
+        model_cls._build_variants = _build_variants  # type: ignore
+        return model_cls
+
+    return delayed_decorator if delayed_build else immediate_decorator

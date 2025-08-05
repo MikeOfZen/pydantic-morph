@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-variants"
-version = "0.2.0"
+version = "0.3.0"
 description = "Create Pydantic model variants with transformation pipelines for different use cases (Input/Output/Update)"
 readme = "README.md"
 authors = [
@@ -34,6 +34,7 @@ classifiers = [
 dev = [
     "deepdiff>=8.5.0",
     "jupyter>=1.1.1",
+    "pytest>=8.4.1",
 ]
 
 [build-system]
