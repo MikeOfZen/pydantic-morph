@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-variants"
-version = "0.3.0"
+version = "0.3.4"
 description = "Create Pydantic model variants with transformation pipelines for different use cases (Input/Output/Update)"
 readme = "README.md"
 authors = [

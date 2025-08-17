@@ -5,6 +5,7 @@ from pydantic.fields import FieldInfo
 
 from pydantic_variants.core import DecomposedModel, ModelTransformer, VariantContext
 from pydantic_variants.field_ops import modify_fieldinfo
+from pydantic_variants.transformers.filter_tag import Tag
 
 
 class ModifyFields(ModelTransformer):
@@ -46,14 +47,25 @@ class ModifyFields(ModelTransformer):
     def __init__(
         self,
         field_modifications: Dict[str, Dict[str, Any]] | None = None,
+        tag_modifications: Dict[Tag, Dict[str, Any]] | None = None,
         modify_func: Callable[[str, FieldInfo], Dict[str, Any]] | None = None,
     ):
-        if sum(x is not None for x in [field_modifications, modify_func]) != 1:
-            raise ValueError("Must provide either field_modifications or modify_func")
+        if sum(x is not None for x in [field_modifications, modify_func, tag_modifications]) != 1:
+            raise ValueError("Must provide either field_modifications or modify_func or tag_modifications")
 
         # Convert dict to function if needed
         if field_modifications:
             self.modify_func = lambda name, field: field_modifications.get(name)
+        elif tag_modifications:
+
+            def get_tag_modifications(name, field):
+                mods = {}
+                for tag in tuple(tag_modifications.keys()):
+                    if tag.in_field(field):
+                        mods.update(tag_modifications[tag])
+                return mods
+
+            self.modify_func = get_tag_modifications
         else:
             self.modify_func = modify_func  # type: ignore
 

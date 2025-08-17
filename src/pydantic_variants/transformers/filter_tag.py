@@ -20,6 +20,11 @@ class Tag:
     def __repr__(self):
         return f"Tag('{self.key}')"
 
+    def in_field(self, field: FieldInfo) -> bool:
+        if not field.metadata:
+            return False
+        return any(isinstance(item, Tag) and item == self for item in field.metadata)
+
 
 class FilterTag(ModelTransformer):
     """
