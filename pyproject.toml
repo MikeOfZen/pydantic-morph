@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-variants"
-version = "0.3.4"
+version = "0.3.9"
 description = "Create Pydantic model variants with transformation pipelines for different use cases (Input/Output/Update)"
 readme = "README.md"
 authors = [
@@ -46,3 +46,6 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 140
+
+[tool.setuptools.package-data]
+pydantic_variants = ["py.typed"]

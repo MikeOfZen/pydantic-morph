@@ -1,10 +1,13 @@
-from typing import Callable
+from typing import Callable, Protocol, TypeVar
 
 from pydantic import BaseModel
 
 from pydantic_variants.core import ModelTransformer, VariantContext, VariantPipe
 from pydantic_variants.transformers import BuildVariant, ConnectVariant
 from pydantic_variants.transformers.extract_variant import ExtractVariant
+
+# Generic type variable to preserve the original model type
+T = TypeVar("T", bound=BaseModel)
 
 
 def basic_variant_pipeline(name: str, *transformers: ModelTransformer) -> VariantPipe:
@@ -25,7 +28,7 @@ def basic_variant_pipeline(name: str, *transformers: ModelTransformer) -> Varian
     return VariantPipe(VariantContext(name), *transformers, BuildVariant(), ConnectVariant(), ExtractVariant())
 
 
-def variants(*pipelines: VariantPipe, delayed_build: bool = False) -> Callable[[type[BaseModel]], type[BaseModel]]:
+def variants(*pipelines: VariantPipe, delayed_build: bool = False) -> Callable[[type[T]], type[T]]:
     """
     Decorator that generates model variants using VariantPipe pipelines.
 
@@ -38,12 +41,12 @@ def variants(*pipelines: VariantPipe, delayed_build: bool = False) -> Callable[[
         Decorated BaseModel class with variants attached or _build_variants method
     """
 
-    def immediate_decorator(model_cls: type[BaseModel]) -> type[BaseModel]:
+    def immediate_decorator(model_cls: type[T]) -> type[T]:
         for pipeline in pipelines:
             pipeline(model_cls)
         return model_cls
 
-    def delayed_decorator(model_cls: type[BaseModel]) -> type[BaseModel]:
+    def delayed_decorator(model_cls: type[T]) -> type[T]:
         def _build_variants():
             for pipeline in pipelines:
                 pipeline(model_cls)

@@ -48,7 +48,7 @@ class ModifyFields(ModelTransformer):
         self,
         field_modifications: Dict[str, Dict[str, Any]] | None = None,
         tag_modifications: Dict[Tag, Dict[str, Any]] | None = None,
-        modify_func: Callable[[str, FieldInfo], Dict[str, Any]] | None = None,
+        modify_func: Callable[[str, FieldInfo], Dict[str, Any] | None] | None = None,
     ):
         if sum(x is not None for x in [field_modifications, modify_func, tag_modifications]) != 1:
             raise ValueError("Must provide either field_modifications or modify_func or tag_modifications")
